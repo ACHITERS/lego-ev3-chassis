@@ -3,11 +3,13 @@ package com.github.achiters;
 import fi.iki.elonen.NanoHTTPD;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 
 public class Ev3ChassisHttpServer extends NanoHTTPD {
 
     private static final int HTTP_PORT = 8080;
-    private static final String HTTP_HOST = "localhost";
 
     private static final String LEFT_CMD_URL = "/left";
     private static final String RIGHT_CMD_URL = "/right";
@@ -17,20 +19,42 @@ public class Ev3ChassisHttpServer extends NanoHTTPD {
 
     private final ChassisCtrl chassisCtrl;
 
-    private Ev3ChassisHttpServer(ChassisCtrl chassisCtrl) {
-        super(HTTP_HOST,HTTP_PORT);
+    private Ev3ChassisHttpServer(String host, int port, ChassisCtrl chassisCtrl) {
+        super(host, port);
         this.chassisCtrl = chassisCtrl;
     }
 
     public static void main(String[] args) {
-//        ChassisCtrl chassisCtrl = new ChassisCtrl();
+        ChassisCtrl chassisCtrl = new ChassisCtrl();
 
         try {
-//            Ev3ChassisHttpServer server = new Ev3ChassisHttpServer(chassisCtrl);
-            Ev3ChassisHttpServer server = new Ev3ChassisHttpServer(null);
+
+            String ipAddress = null;
+
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp())
+                    continue;
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+
+                if (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    ipAddress = addr.getHostAddress();
+                    break;
+                }
+            }
+
+            if (ipAddress == null) {
+                throw new RuntimeException("Non localhost IP Address not found");
+            }
+
+
+            Ev3ChassisHttpServer server = new Ev3ChassisHttpServer(ipAddress, HTTP_PORT, chassisCtrl);
             server.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
         } catch (IOException e) {
-            System.err.println("Couldn't start server:\n" + e);
+            throw new RuntimeException("Server not started", e);
         }
     }
 
